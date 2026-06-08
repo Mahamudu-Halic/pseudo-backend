@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 import os
 
-from database import Base, engine, get_db
+from database import Base, engine, get_db, SessionLocal
 from models import User, Report, Region, MMDA, ProblemCategory
 from schemas import (
     LoginRequest, SignupRequest, LoginResponse, UserResponse,
@@ -19,17 +19,165 @@ from auth import (
 # Create tables
 Base.metadata.create_all(bind=engine)
 
+# Auto-seed database if empty
+def seed_database_if_empty():
+    """Seed database with test data if it's empty"""
+    db = SessionLocal()
+    try:
+        # Check if users exist
+        user_count = db.query(User).count()
+        if user_count == 0:
+            print("🌱 Database is empty, seeding with test data...")
+            
+            # Create regions
+            regions = [
+                Region(id="region-001", name="Ashanti Region"),
+                Region(id="region-002", name="Greater Accra Region"),
+                Region(id="region-003", name="Eastern Region"),
+            ]
+            db.add_all(regions)
+            db.commit()
+            print("✅ Created regions")
+            
+            # Create MMDAs
+            mmdas = [
+                MMDA(id="mmda-001", name="Kumasi Metropolitan Assembly", region_id="region-001"),
+                MMDA(id="mmda-002", name="Asokwa Municipal Assembly", region_id="region-001"),
+                MMDA(id="mmda-003", name="Accra Metropolitan Assembly", region_id="region-002"),
+                MMDA(id="mmda-004", name="Tema Metropolitan Assembly", region_id="region-002"),
+                MMDA(id="mmda-005", name="Cape Coast Metropolitan Assembly", region_id="region-003"),
+            ]
+            db.add_all(mmdas)
+            db.commit()
+            print("✅ Created MMDAs")
+            
+            # Create problem categories
+            categories = [
+                ProblemCategory(id="cat-001", name="Roads & Infrastructure"),
+                ProblemCategory(id="cat-002", name="Water & Sanitation"),
+                ProblemCategory(id="cat-003", name="Electricity"),
+                ProblemCategory(id="cat-004", name="Waste Management"),
+                ProblemCategory(id="cat-005", name="Education"),
+                ProblemCategory(id="cat-006", name="Health"),
+                ProblemCategory(id="cat-007", name="Security"),
+                ProblemCategory(id="cat-008", name="Other"),
+            ]
+            db.add_all(categories)
+            db.commit()
+            print("✅ Created problem categories")
+            
+            # Create test users
+            users = [
+                User(
+                    id=generate_uuid(),
+                    email="citizen@example.com",
+                    display_name="John Doe",
+                    phone="+233123456789",
+                    hashed_password=hash_password("password123"),
+                    role="citizen",
+                    region="region-001",
+                    is_active=True
+                ),
+                User(
+                    id=generate_uuid(),
+                    email="minister@example.com",
+                    display_name="Hon. Jane Smith",
+                    phone="+233987654321",
+                    hashed_password=hash_password("password123"),
+                    role="minister",
+                    region="region-001",
+                    is_active=True
+                ),
+                User(
+                    id=generate_uuid(),
+                    email="official@example.com",
+                    display_name="Mr. Peter Mensah",
+                    phone="+233555555555",
+                    hashed_password=hash_password("password123"),
+                    role="glinax",
+                    region="region-001",
+                    is_active=True
+                ),
+            ]
+            db.add_all(users)
+            db.commit()
+            print("✅ Created test users")
+            print("   - Citizen: citizen@example.com / password123")
+            print("   - Minister: minister@example.com / password123")
+            print("   - Official: official@example.com / password123")
+            
+            # Create sample reports
+            citizen_user = db.query(User).filter(User.email == "citizen@example.com").first()
+            if citizen_user:
+                reports = [
+                    Report(
+                        id=generate_uuid(),
+                        user_id=citizen_user.id,
+                        region="region-001",
+                        mmda="mmda-001",
+                        community="Asawase",
+                        category="Roads & Infrastructure",
+                        title="Pothole on Adum Road",
+                        description="There is a large pothole on Adum Road near the market that is dangerous for vehicles and pedestrians.",
+                        severity="high",
+                        ghana_postgps="AS-001-0001",
+                        status="pending"
+                    ),
+                    Report(
+                        id=generate_uuid(),
+                        user_id=citizen_user.id,
+                        region="region-001",
+                        mmda="mmda-001",
+                        community="Kwadaso",
+                        category="Water & Sanitation",
+                        title="Water shortage in Kwadaso",
+                        description="The community has been without water for 3 weeks. We need urgent attention.",
+                        severity="high",
+                        status="in_progress"
+                    ),
+                ]
+                db.add_all(reports)
+                db.commit()
+                print("✅ Created sample reports")
+            
+            print("🌱 Database seeding completed!")
+        else:
+            print(f"✅ Database already has {user_count} users, skipping seed")
+    except Exception as e:
+        print(f"❌ Error seeding database: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
 # FastAPI app
 app = FastAPI(title="Ashanti Community Reports API", version="0.1.0")
 
 # CORS middleware
+# Read allowed origins from environment variable so you can add your
+# deployed frontend URL (e.g. https://ashanti.vercel.app) without
+# touching this file. Falls back to localhost for local development.
+# On Render, set: ALLOWED_ORIGINS=https://your-frontend.vercel.app
+# Multiple origins are comma-separated, e.g.:
+#   ALLOWED_ORIGINS=https://ashanti.vercel.app,https://www.ashanti.vercel.app
+_raw_origins = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:3000,http://localhost:3001"
+)
+ALLOWED_ORIGINS = [origin.strip() for origin in _raw_origins.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Seed database on startup
+@app.on_event("startup")
+def startup_event():
+    """Run seed on app startup"""
+    seed_database_if_empty()
 
 # Helper function to get current user from token
 def get_current_user(db: Session = Depends(get_db)):
