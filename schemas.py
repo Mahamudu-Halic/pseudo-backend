@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
@@ -38,10 +38,12 @@ class LoginRequest(BaseModel):
 class SignupRequest(BaseModel):
     email: str
     password: str
-    display_name: str
+    display_name: str = Field(alias="displayName")
     phone: str
     region: str
     role: str = "citizen"
+    
+    model_config = ConfigDict(populate_by_name=True)
 
 # User
 class UserBase(BaseModel):
@@ -72,8 +74,10 @@ class ReportBase(BaseModel):
     title: str
     description: str
     severity: str
-    ghanaPostgps: Optional[str] = None
-    fileUrl: Optional[str] = None
+    ghana_postgps: Optional[str] = Field(None, alias="ghanaPostgps")
+    file_url: Optional[str] = Field(None, alias="fileUrl")
+    
+    model_config = ConfigDict(populate_by_name=True)
 
 class ReportCreate(ReportBase):
     pass
@@ -86,9 +90,11 @@ class ReportUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     severity: Optional[str] = None
-    ghanaPostgps: Optional[str] = None
-    fileUrl: Optional[str] = None
+    ghana_postgps: Optional[str] = Field(None, alias="ghanaPostgps")
+    file_url: Optional[str] = Field(None, alias="fileUrl")
     status: Optional[str] = None
+    
+    model_config = ConfigDict(populate_by_name=True)
 
 class ReportResponse(BaseModel):
     id: str
