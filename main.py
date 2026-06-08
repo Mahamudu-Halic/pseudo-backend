@@ -231,8 +231,8 @@ def submit_report(report: ReportCreate, db: Session = Depends(get_db)):
         title=report.title,
         description=report.description,
         severity=report.severity,
-        ghana_postgps=report.ghanaPostgps,
-        file_url=report.fileUrl,
+        ghana_postgps=report.ghana_postgps,
+        file_url=report.file_url,
         status="pending"
     )
     
@@ -348,15 +348,10 @@ def update_report(report_id: str, report_data: ReportUpdate, db: Session = Depen
         raise HTTPException(status_code=404, detail="Report not found")
     
     # Update fields if provided
-    for key, value in report_data.dict(exclude_unset=True).items():
+    update_data = report_data.dict(exclude_unset=True)
+    for key, value in update_data.items():
         if hasattr(report, key):
-            # Convert camelCase to snake_case for certain fields
-            if key == "ghanaPostgps":
-                setattr(report, "ghana_postgps", value)
-            elif key == "fileUrl":
-                setattr(report, "file_url", value)
-            else:
-                setattr(report, key, value)
+            setattr(report, key, value)
     
     db.commit()
     db.refresh(report)
