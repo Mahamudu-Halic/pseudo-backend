@@ -153,9 +153,21 @@ def seed_database_if_empty():
 app = FastAPI(title="Ashanti Community Reports API", version="0.1.0")
 
 # CORS middleware
+# Read allowed origins from environment variable so you can add your
+# deployed frontend URL (e.g. https://ashanti.vercel.app) without
+# touching this file. Falls back to localhost for local development.
+# On Render, set: ALLOWED_ORIGINS=https://your-frontend.vercel.app
+# Multiple origins are comma-separated, e.g.:
+#   ALLOWED_ORIGINS=https://ashanti.vercel.app,https://www.ashanti.vercel.app
+_raw_origins = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:3000,http://localhost:3001"
+)
+ALLOWED_ORIGINS = [origin.strip() for origin in _raw_origins.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "https://ashanti.vercel.app"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
